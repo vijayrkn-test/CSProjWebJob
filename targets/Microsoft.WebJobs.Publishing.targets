@@ -62,7 +62,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     </WebJobPublishDependsOn>
   </PropertyGroup>
   
-  <Target Name="WebJobPublish" AfterTargets="Build" DependsOnTargets="$(WebJobPublishDependsOn)" Condition=" '$(DeployOnBuild)'=='true' ">
+  <Target Name="WebJobPublish" AfterTargets="Build" DependsOnTargets="$(WebJobPublishDependsOn)" Condition=" '$(DeployOnBuild)'=='true' and '$(IsWebJob)' =='true' ">
 
 	<ValidateParameter
       ParameterName="MsDeployServiceUrl"
