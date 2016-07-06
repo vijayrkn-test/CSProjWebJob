@@ -1,0 +1,186 @@
+﻿<!--
+***********************************************************************************************
+Microsoft.WebJobs.Publishing.targets  
+
+WARNING:  DO NOT MODIFY this file unless you are knowledgeable about MSBuild and have
+          created a backup copy.  Incorrect changes to this file will make it
+          impossible to load or build your web deploy projects from the command-line or the IDE.
+
+This file defines the steps in the standard build process to deploy web application projects.
+
+Copyright (C) Microsoft Corporation. All rights reserved.
+***********************************************************************************************
+-->
+
+<Project
+    xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- The build process can be extended in a similar way as MS.Common.targets -->
+
+  <PropertyGroup>
+    <ImportByWildcardBeforeMicrosoftWebJobsPublishingTargets Condition="'$(ImportByWildcardBeforeMicrosoftWebJobsPublishingTargets)'==''">true</ImportByWildcardBeforeMicrosoftWebJobsPublishingTargets>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)\$(MSBuildThisFileName)\ImportBefore\*" Condition="'$(ImportByWildcardBeforeMicrosoftWebJobsPublishingTargets)' == 'true' and exists('$(MSBuildThisFileDirectory)\$(MSBuildThisFileName)\ImportBefore')"/>
+
+
+  <!--
+  ***********************************************************************************************
+  Including the tasks
+  ***********************************************************************************************
+ -->
+  <PropertyGroup>
+    <WebPublishTasksDir Condition=" '$(WebPublishTasksDir)'=='' ">$(MSBuildThisFileDirectory)..\</WebPublishTasksDir>
+  </PropertyGroup>
+  <UsingTask TaskName="MSDeploy" AssemblyFile="$(WebPublishTasksDir)Microsoft.Web.Publishing.Tasks.dll"/>
+  <UsingTask TaskName="VSMSDeploy" AssemblyFile="$(WebPublishTasksDir)Microsoft.Web.Publishing.Tasks.dll"/>
+  <UsingTask TaskName="NormalizeServiceUrl" AssemblyFile="$(WebPublishTasksDir)Microsoft.Web.Publishing.Tasks.dll"/>
+  <UsingTask TaskName="ValidateParameter" AssemblyFile="$(WebPublishTasksDir)Microsoft.Web.Publishing.Tasks.dll"/>
+
+  <!--
+  ***********************************************************************************************
+  Import the publish profile
+  ***********************************************************************************************
+ -->
+  <PropertyGroup Condition="'$(PublishProfile)' != ''">
+    <PublishProfileRootFolder Condition="'$(PublishProfileRootFolder)' == '' ">$(MSBuildProjectDirectory)\Properties\PublishProfiles\</PublishProfileRootFolder>
+    <PublishProfileName Condition="'$(PublishProfileName)' == ''">$([System.IO.Path]::GetFileNameWithoutExtension($(PublishProfile)))</PublishProfileName>
+    <WebPublishProfileFile Condition="'$(WebPublishProfileFile)' == ''">$(PublishProfileRootFolder)$(PublishProfileName).pubxml</WebPublishProfileFile>
+  </PropertyGroup>
+  <Import Project="$(WebPublishProfileFile)" Condition="Exists($(WebPublishProfileFile))"/>
+
+
+  
+  <!--
+  ***********************************************************************************************
+  TARGET : WebJobPublish
+  ***********************************************************************************************
+ -->
+   <PropertyGroup>
+    <WebJobPublishDependsOn>
+      $(WebJobPublishDependsOn);
+      Build;
+    </WebJobPublishDependsOn>
+  </PropertyGroup>
+  
+  <Target Name="WebJobPublish" AfterTargets="Build" DependsOnTargets="$(WebJobPublishDependsOn)" Condition=" '$(DeployOnBuild)'=='true' And '$(IsWebJob)' =='true' ">
+
+	<ValidateParameter
+      ParameterName="MsDeployServiceUrl"
+      ParameterValue="$(MsDeployServiceUrl)"/>
+	  
+    <ItemGroup>
+		<OutDir Include="$(OutDir)\**" />
+	</ItemGroup>
+	
+    <Move
+        SourceFiles="@(OutDir)"
+        DestinationFolder="$(PublishOutputPath)" />
+	
+    <!-- Normalize service url such as convert a server name to format like https://<server>:8172/msdeploy.axd-->
+    <NormalizeServiceUrl ServiceUrl="$(MsDeployServiceUrl)" UseWMSVC="true" UseRemoteAgent="false">
+      <Output TaskParameter="ResultUrl" PropertyName="MsDeployServiceUrl" />
+    </NormalizeServiceUrl>
+    
+    <!--  Data Passed to MSDeploy -->
+    <ItemGroup>
+      <MsDeploySourceProviderSetting Include="IisApp">
+        <Path>$(MSBuildProjectDirectory)\$(OutputPath)</Path>
+      </MsDeploySourceProviderSetting>
+      <MsDeployDestinationProviderSetting Include="IisApp">
+        <Path>$(DeployIisAppPath)</Path>
+        <ComputerName>$(MsDeployServiceUrl)</ComputerName>
+        <UserName>$(UserName)</UserName>
+        <Password>$(Password)</Password>
+        <IncludeAcls>False</IncludeAcls>
+        <AuthType>Basic</AuthType>
+      </MsDeployDestinationProviderSetting>
+    </ItemGroup>
+
+    <PropertyGroup>
+      <RetryAttemptsForDeployment Condition=" '$(RetryAttemptsForDeployment)' == '' ">2</RetryAttemptsForDeployment>
+      <MsDeployDoNotDeleteRule Condition="$(SkipExtraFilesOnServer) == 'true'">DoNotDeleteRule</MsDeployDoNotDeleteRule>
+      <_EnableRuleList>$(MsDeployDoNotDeleteRule)</_EnableRuleList>
+
+      <MSDeployUseChecksum Condition=" '$(MSDeployUseChecksum)' == '' ">false</MSDeployUseChecksum>
+      <AllowUntrustedCertificate Condition=" '$(AllowUntrustedCertificate)' == '' ">false</AllowUntrustedCertificate>
+
+      <!-- UserAgent string sent to msdeploy -->
+      <_MSDeployUserAgentSource Condition=" '$(BuildingInsideVisualStudio)' != 'true'">$(VisualStudioVersion):CmdLine</_MSDeployUserAgentSource>
+      <_MSDeployUserAgentSource Condition=" '$(BuildingInsideVisualStudio)' == 'true'">$(VisualStudioVersion):PublishDialog</_MSDeployUserAgentSource>
+      <_MSDeployUserAgent>VS$(_MSDeployUserAgentSource)</_MSDeployUserAgent>
+    </PropertyGroup>
+
+    <VSMSDeploy
+        Source="@(MsDeploySourceProviderSetting)"
+        Destination="@(MsDeployDestinationProviderSetting)"
+        EnableLink="$(PublishEnableLinks)"
+        AllowUntrustedCertificate="$(AllowUntrustedCertificate)"
+        BuildingInsideVisualStudio="$(BuildingInsideVisualStudio)"
+        SkipExtraFilesOnServer="$(SkipExtraFilesOnServer)"
+        SkipRuleItems="@(MsDeploySkipRules)"
+        WhatIf="false"
+        RetryAttempts="$(RetryAttemptsForDeployment)"
+        EnableMSDeployBackup="$(EnableMSDeployBackup)"
+        UseChecksum="$(MSDeployUseChecksum)"
+        UserAgent="$(_MSDeployUserAgent)"
+        InvokedByPublish="true">
+      <Output TaskParameter="Result" PropertyName="_PublishResult" />
+    </VSMSDeploy>
+    
+
+  </Target>
+
+  
+  <!--
+  ***********************************************************************************************
+  Item Definitions
+  ***********************************************************************************************
+ -->
+
+  <ItemDefinitionGroup>
+    <MsDeploySourceProviderSetting>
+      <Path></Path>
+      <ComputerName></ComputerName>
+      <!--<Wmsvc></Wmsvc>  Not supported yet-->
+      <UserName></UserName>
+      <Password></Password>
+      <EncryptPassword></EncryptPassword>
+      <IncludeAcls></IncludeAcls>
+      <authType></authType>
+      <prefetchPayload></prefetchPayload>
+    </MsDeploySourceProviderSetting>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <MsDeployDestinationProviderSetting>
+      <Path></Path>
+      <ComputerName></ComputerName>
+      <!--<Wmsvc></Wmsvc>  Not supported yet-->
+      <UserName></UserName>
+      <Password></Password>
+      <EncryptPassword></EncryptPassword>
+      <IncludeAcls></IncludeAcls>
+      <authType></authType>
+      <prefetchPayload></prefetchPayload>
+    </MsDeployDestinationProviderSetting>
+  </ItemDefinitionGroup>
+  <!--
+  DeploymentSkipRule(string skipAction, string objectName, string absolutePath, string XPath);-->
+  <ItemDefinitionGroup>
+    <MsDeploySkipRules>
+      <SkipAction></SkipAction>
+      <ObjectName></ObjectName>
+      <AbsolutePath></AbsolutePath>
+      <XPath></XPath>
+      <KeyAttribute></KeyAttribute>
+      <!--Source, Destination, Both(the default)-->
+      <Apply></Apply>
+    </MsDeploySkipRules>
+  </ItemDefinitionGroup>
+
+  <!-- The build process can be extended in a similar way as MS.Common.targets -->
+  <PropertyGroup>
+    <ImportByWildcardAfterMicrosoftWebJobsPublishingTargets Condition="'$(ImportByWildcardAfterMicrosoftWebJobsPublishingTargets)'==''">true</ImportByWildcardAfterMicrosoftWebJobsPublishingTargets>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)\$(MSBuildThisFileName)\ImportAfter\*" Condition="'$(ImportByWildcardAfterMicrosoftWebJobsPublishingTargets)' == 'true' and exists('$(MSBuildThisFileDirectory)\$(MSBuildThisFileName)\ImportAfter')"/>
+</Project>

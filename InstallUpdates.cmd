@@ -1,0 +1,2 @@
+xcopy targets\Microsoft.WebJobs.ImportAfter.targets "C:\Program Files (x86)\MSBuild\14.0\Microsoft.Common.Targets\ImportAfter" /F /R /Y /I
+xcopy targets\Microsoft.WebJobs.Publishing.targets "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v14.0\Web\WebJobs" /F /R /Y /I
