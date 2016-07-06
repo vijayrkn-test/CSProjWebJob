@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25417.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebJob", "WebJob\WebJob.csproj", "{CB525BFF-458E-4F4F-A298-641F4A6517AE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinifierJob", "WebJob\MinifierJob.csproj", "{CB525BFF-458E-4F4F-A298-641F4A6517AE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
